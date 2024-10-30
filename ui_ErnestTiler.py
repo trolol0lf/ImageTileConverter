@@ -6,6 +6,8 @@ from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox,
     QMenuBar, QPushButton, QSizePolicy, QStatusBar,
     QWidget, QGridLayout, QWidget, QSlider)
 import os, time
+
+from networkx import number_weakly_connected_components
 from Handler_Formats import *
 
 class DragItem(QLabel):
@@ -225,15 +227,16 @@ class DragGraphicsView(QGraphicsView):
         self.ApplyZoomFactors()
     
     def move_img_delta(self, deltaX, deltaY):
-        self.deltaX += deltaX
-        self.deltaY += deltaY        
+        self.currentTotalZoomFactor = self.currentInternalZoomFactor * self.currentPanelZoomFactor
+        self.deltaX += deltaX / self.currentTotalZoomFactor
+        self.deltaY += deltaY / self.currentTotalZoomFactor      
         self.ApplyZoomFactors()
 
     def ApplyZoomFactors(self, MWheelInduced = False, e = None):        
         if len(self.theScene.items()) > 0:  #Clean old items from Scene
             self.theScene.removeItem(self.theScene.items()[0])
         if self.TruePixMap is not None:
-            self.currentTotalZoomFactor = self.currentPanelZoomFactor * self.currentInternalZoomFactor
+            self.currentTotalZoomFactor = self.currentInternalZoomFactor * self.currentPanelZoomFactor
             realSource = None
             if e:
                 try:
@@ -245,8 +248,8 @@ class DragGraphicsView(QGraphicsView):
                     curDragPixMap = e.source().XYOffset
                     self.deltaX = self.deltaX-curDragPixMap[0]
                     self.deltaY = self.deltaY-curDragPixMap[1]
-                    
-            self.curtransform = QTransform().translate(self.deltaX, self.deltaY)
+            
+            self.curtransform = QTransform().translate(self.deltaX*self.currentTotalZoomFactor, self.deltaY*self.currentTotalZoomFactor)
             self.curtransform.scale(self.currentTotalZoomFactor, self.currentTotalZoomFactor)
             self.ViewPixMap = QGraphicsPixmapItem(self.TruePixMap.copy())
             self.ViewPixMap.setTransform(self.curtransform)             
@@ -269,7 +272,7 @@ class DragGraphicsView(QGraphicsView):
         if self.ViewPixMap is not None:
             theViewMap = self.ViewPixMap.pixmap()
             trueSize = (good_int(self.RootParent.Txt_TilePixelSizeX.text()), good_int(self.RootParent.Txt_TilePixelSizeY.text()))
-            trueOffset = (self.curtransform.dx(), self.curtransform.dy())
+            trueOffset = (self.curtransform.dx()/self.currentTotalZoomFactor, self.curtransform.dy()/self.currentTotalZoomFactor)
             CorrectImg = QImage(trueSize[0], trueSize[1], QImage.Format.Format_ARGB32)
             painter = QPainter(CorrectImg)
             painter.drawPixmap(trueOffset[0], trueOffset[1], theViewMap)
@@ -503,7 +506,7 @@ class Ui_ImageTilerObj(object):
         ## Main Frame
         self.MainFrame = QFrame(self.centralwidget)
         self.MainFrame.setObjectName(u"MainFrame")
-        self.MainFrame.setGeometry(QRect(20, 60, 1131, 741))
+        self.MainFrame.setGeometry(QRect(20, 78, 1131, 741))
         self.MainFrame.setFrameShape(QFrame.StyledPanel)
         self.MainFrame.setFrameShadow(QFrame.Raised)
 
@@ -750,7 +753,7 @@ class Ui_ImageTilerObj(object):
         ## Finish Frame
         self.Frm_Finish = QFrame(self.centralwidget)
         self.Frm_Finish.setObjectName(u"Frm_Finish")
-        self.Frm_Finish.setGeometry(QRect(600, 10, 391, 71))
+        self.Frm_Finish.setGeometry(QRect(600, 5, 540, 71))
         self.Frm_Finish.setFrameShape(QFrame.StyledPanel)
         self.Frm_Finish.setFrameShadow(QFrame.Raised)
         self.Lab_FinSave = QLabel(self.Frm_Finish)
@@ -759,6 +762,10 @@ class Ui_ImageTilerObj(object):
         self.Btn_Save = QPushButton(self.Frm_Finish)
         self.Btn_Save.setObjectName(u"Btn_Save")
         self.Btn_Save.setGeometry(QRect(300, 20, 75, 23))
+        self.Btn_SaveIndividualy = QPushButton(self.Frm_Finish)
+        self.Btn_SaveIndividualy.setObjectName(u"Btn_SaveIndividualy")
+        self.Btn_SaveIndividualy.setGeometry(QRect(385, 20, 150, 23))
+
         self.Txt_SaveName = QLineEdit(self.Frm_Finish)
         self.Txt_SaveName.setObjectName(u"Txt_SaveName")
         self.Txt_SaveName.setGeometry(QRect(10, 20, 151, 20))
@@ -846,7 +853,8 @@ class Ui_ImageTilerObj(object):
         self.Lab_SelTargetFolder.setText(QCoreApplication.translate("ImageTilerObj", u"2. Select Target Folder", None))
         self.Btn_SelTargetFolder.setText(QCoreApplication.translate("ImageTilerObj", u"Select", None))
         self.Lab_FinSave.setText(QCoreApplication.translate("ImageTilerObj", u"Finnish: Save Panel", None))
-        self.Btn_Save.setText(QCoreApplication.translate("ImageTilerObj", u"Save", None))
+        self.Btn_Save.setText(QCoreApplication.translate("ImageTilerObj", u"Save Panel", None))
+        self.Btn_SaveIndividualy.setText(QCoreApplication.translate("ImageTilerObj", u"Save Tiles individualy", None))
         self.Lab_FinSaveNameText.setText(QCoreApplication.translate("ImageTilerObj", u"Finish: SaveName", None))
         self.Lab_FinFormat.setText(QCoreApplication.translate("ImageTilerObj", u"Finish: Fileformat", None))
         self.Checkb_FinAutoIncrease.setText(QCoreApplication.translate("ImageTilerObj", u"Auto increase - Prevent File overwrite", None))
@@ -855,6 +863,7 @@ class Ui_ImageTilerObj(object):
         self.Lab_CurPanelPreviewZoom.setText(QCoreApplication.translate("ImageTilerObj", u"Preview Zoom", None))
         self.menuCustom_Made_Tool_For_Ernest_Programming_is_fun.setTitle(QCoreApplication.translate("ImageTilerObj", u"Custom Made Tool For Ernest. Programming is fun!!", None))
         self.set_all_textfields_and_text_colors()
+        self.SetAllFramesBordersSizes(maxlinewidth = 3,maxdepth = 3)
     # retranslateUi
 
     def ToggleWidgetColor(self, TWidget, alternativecolor = None):
@@ -988,3 +997,17 @@ class Ui_ImageTilerObj(object):
             return rgb_white
         else:
             return rgb_black
+        
+    def SetAllFramesBordersSizes(self, obj = None, maxlinewidth = 5, maxdepth = 0, depth = 0):
+        #recursively sets frame borders for all frames directly contained in other frames of main window
+        if obj is None: 
+            obj = self.children()[1]
+        for i in obj.children():
+            if type(i) == QFrame and not i.objectName().startswith("Lin_"):
+                newdepth = depth + 1
+                i.setFrameShape(QFrame.Shape.Box)
+                i.setFrameShadow(QFrame.Shadow.Raised)
+                truelinewidth = good_int(maxlinewidth * (1-depth/maxdepth))
+                i.setLineWidth(truelinewidth)
+                if depth < maxdepth:
+                    self.SetAllFramesBordersSizes(i, maxlinewidth, maxdepth, newdepth)

@@ -63,6 +63,7 @@ class Window(QMainWindow, Ui_ImageTilerObj):
         self.Txt_SaveName.textChanged.connect(self.UserChangedSaveName)
         #Step4.2 Save Panel
         self.Btn_Save.clicked.connect(self.FinalSavePanel)
+        self.Btn_SaveIndividualy.clicked.connect(self.FinalSavePanelIndiv)
 
         #Load last settings
         self.load_SaveDic()
@@ -169,7 +170,10 @@ class Window(QMainWindow, Ui_ImageTilerObj):
         if self.Checkb_FinAutoIncrease.isChecked():
             self.UserChangedSaveName()
 
-    def FinalSavePanel(self):
+    def FinalSavePanelIndiv(self):
+        self.FinalSavePanel(saveindividualy = True)
+        
+    def FinalSavePanel(self, saveindividualy = False):
         if not self.Check_FinalSavePanel_Vars(): return
         imgs = []
 
@@ -182,21 +186,42 @@ class Window(QMainWindow, Ui_ImageTilerObj):
             else:
                 imgs.append(QPixmap(FrameSize[0], FrameSize[1]).toImage())
         
-        CorrectPanel = QImage(PanelSize[0], PanelSize[1], QImage.Format.Format_ARGB32)
-        painter = QPainter(CorrectPanel)
+        if not saveindividualy:
+            CorrectPanel = QImage(PanelSize[0], PanelSize[1], QImage.Format.Format_ARGB32)
 
-        painter.drawImage(0, 0, imgs[0])
-        painter.drawImage(FrameSize[0], 0, imgs[1])
-        painter.drawImage(0, FrameSize[1], imgs[2])
-        painter.drawImage(FrameSize[0], FrameSize[1], imgs[3])
-        painter.end()
-        self.SavePanel(CorrectPanel)
+            painter = QPainter(CorrectPanel)
+            painter.drawImage(0, 0, imgs[0])
+            painter.drawImage(FrameSize[0], 0, imgs[1])
+            painter.drawImage(0, FrameSize[1], imgs[2])
+            painter.drawImage(FrameSize[0], FrameSize[1], imgs[3])
+            painter.end()
+
+            self.SavePanel(CorrectPanel)
+        else:
+            self.SaveTilesIndividually(imgs)
         
     def SavePanel(self, PanelQImage):
         TargetFileFormat = self.Cmb_FinFileFormat.currentText()
         TargetFileFolder = self.Txt_SelTargetFolder.text()
         TargetFileName = self.Txt_SaveName.text()
         PanelQImage.save(TargetFileFolder + "\\" + TargetFileName + TargetFileFormat)
+    
+    def SaveTilesIndividually(self, Tiles = None):
+        if Tiles == None: return False
+        TargetFileFormat = self.Cmb_FinFileFormat.currentText()
+        TargetFileFolder = self.Txt_SelTargetFolder.text()
+        TargetFileBaseName = self.Txt_SaveName.text()
+        TargetFileName = ""
+
+        for i in range(len(Tiles)):
+            if TargetFileName == "": 
+                TargetFileName = self.get_solid_filename(TargetFileFolder, TargetFileBaseName + "_", TargetFileFormat)
+                if TargetFileName[-1] == "_": TargetFileName = TargetFileName + "1"
+            TargetFileName = self.get_solid_filename(TargetFileFolder, TargetFileName, TargetFileFormat)
+            if not TargetFileName: return False
+            Tiles[i].save(os.path.join(TargetFileFolder, TargetFileName + TargetFileFormat))
+
+        return True
     def Check_FinalSavePanel_Vars(self):
         #Folder
         if self.Txt_SelTargetFolder.text() == "":
@@ -219,7 +244,7 @@ class Window(QMainWindow, Ui_ImageTilerObj):
                 lastIncrement = re.search(r"(\_|\-)\d+$", basename)
                 if not lastIncrement == None:
                     lastIncrement = lastIncrement.group(0)
-                    basename = basename.replace(lastIncrement, "")
+                    basename = basename[:-len(lastIncrement)]
                     incrementer = int(lastIncrement.replace("_", "").replace("-", ""))
                 while os.path.exists(os.path.join(folder, basename + "_" + str(incrementer)  + fileformat)):
                     incrementer += 1
