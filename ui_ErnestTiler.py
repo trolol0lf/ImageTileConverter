@@ -6,8 +6,6 @@ from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox,
     QMenuBar, QPushButton, QSizePolicy, QStatusBar,
     QWidget, QGridLayout, QWidget, QSlider)
 import os, time
-
-from networkx import number_weakly_connected_components
 from Handler_Formats import *
 
 class DragItem(QLabel):
