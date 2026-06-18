@@ -9,6 +9,17 @@ def good_int(var):
             return int(round(var,0))
         elif type(var) == int:
             return var
+def floor_int(var):
+    if type(var) == str:
+        try:
+            ret = int(var)
+        except:
+            ret = 0
+        return int(ret)
+    elif type(var) == float:
+        return int(var - var % 1)
+    elif type(var) == int:
+        return var
 
 def good_float(var):        
         if type(var) == str:

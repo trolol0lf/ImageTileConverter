@@ -4,12 +4,14 @@
 # Finally the user starts the process by pressing a buttonand for each image it crops it to the user preset size and converts it into .webp as well saves it to another selected folder
 from FileHandler import *
 from PySide6.QtWidgets import QApplication, QMainWindow, QStyleFactory
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QPixmap, QImage, QPainter
+from PySide6.QtCore import Qt, QPointF, QRect
+from PySide6.QtGui import QPixmap, QImage, QPainter, QMouseEvent
 from ui_ErnestTiler import *    #Ui_ImageTilerObj, good_int
 from Handler_Formats import *
 import json, win32api, win32con, sys
-        
+    
+
+
 class Window(QMainWindow, Ui_ImageTilerObj):
     def __init__(self):
 
@@ -46,10 +48,25 @@ class Window(QMainWindow, Ui_ImageTilerObj):
 
         self.Checkb_LinkXY.stateChanged.connect(self.UserChangedPixelSizeLinkXY)
         
+        ##Step3.2.1.1 Adjust Tiles 
+        self.Txt_Tiles_X.textChanged.connect(self.TileXChanged)
+        self.Txt_Tiles_Y.textChanged.connect(self.TileYChanged)
+        self.Sli_Tiles_X.valueChanged.connect(self.TileSliderXChanged)
+        self.Sli_Tiles_Y.valueChanged.connect(self.TileSliderYChanged)
+        
+        ##Step3.2.1.2 Adjust Distance
+        self.Txt_PanelDistance_X.textChanged.connect(self.DistanceXChanged)
+        self.Txt_PanelDistance_Y.textChanged.connect(self.DistanceYChanged)
+        self.Sli_PanelDistance_X.valueChanged.connect(self.DistanceSliderXChanged)
+        self.Sli_PanelDistance_Y.valueChanged.connect(self.DistanceSliderYChanged)
+
+        ##Step3.2.1.3 Grid Movement
+        self.Frm_TheNewPanel.setMouseTracking(True)
+        
         ##Step3.2.2 Adjust the CurPanelPreviewZoom
         self.Txt_CurPanelPreviewZoom.textChanged.connect(self.UserChangedCurPanelPreviewZoom)
         self.HoSli_CurPanelPreviewZoom.valueChanged.connect(self.UserChangedCurPanelPreviewZoom)
-
+        ##Step3.2.3 Right click moves grid
         #Step3.3.1 Drag from Lis_SourceFiles to Img_CurSel (1-4) to import an image to the tile
         #Gets managed in Class!
 
@@ -130,6 +147,64 @@ class Window(QMainWindow, Ui_ImageTilerObj):
             self.Txt_TotalPixelSizeY.setText("9")
         self.Var_TilePixelSizeRatio = tRatio
 
+    ##Step 3.3.1.1 Tile Amount Changed
+    internaltilecall = False
+    def TileXChanged(self):
+        txt = self.Txt_Tiles_X.text()
+        if not txt == "" and not self.internaltilecall:
+            real = max(min(int(txt), self.Sli_Tiles_X.maximum()), self.Sli_Tiles_X.minimum()) 
+            self.internaltilecall = True
+            self.Txt_Tiles_X.setText(str(real))
+            self.Sli_Tiles_X.setValue(real)
+            self.UpdateTileGrid()
+            self.internaltilecall = False
+    def TileYChanged(self):
+        txt = self.Txt_Tiles_Y.text()
+        if not txt == "" and not self.internaltilecall:
+            real = max(min(int(txt), self.Sli_Tiles_Y.maximum()), self.Sli_Tiles_Y.minimum())
+            self.internaltilecall = True
+            self.Txt_Tiles_Y.setText(str(real)) 
+            self.Sli_Tiles_Y.setValue(real)
+            self.UpdateTileGrid()
+            self.internaltilecall = False
+
+    def TileSliderXChanged(self):
+        if not self.internaltilecall: 
+            self.Txt_Tiles_X.setText(str(self.Sli_Tiles_X.value()))
+    def TileSliderYChanged(self):
+        if not self.internaltilecall: 
+            self.Txt_Tiles_Y.setText(str(self.Sli_Tiles_Y.value()))
+
+    ##Step 3.3.1.2 Distance Changed
+    internaldistancecall = False
+    def DistanceXChanged(self):
+        txt = self.Txt_PanelDistance_X.text()
+        if not txt == "" and not self.internaldistancecall: 
+            self.internaldistancecall = True
+            real = max(min(int(txt), self.Sli_PanelDistance_X.maximum() * 100), self.Sli_PanelDistance_X.minimum())
+            self.Txt_PanelDistance_X.setText(str(real))
+            self.Sli_PanelDistance_X.setValue(real)
+            self.UserChangedPixelSizeText()
+            self.Apply_Image_Zooms(self.get_WidgetSize(self.Frm_TheNewPanel))
+            self.internaldistancecall = False
+    def DistanceYChanged(self):
+        txt = self.Txt_PanelDistance_Y.text()
+        if not txt == "" and not self.internaldistancecall: 
+            self.internaldistancecall = True
+            real = max(min(int(txt), self.Sli_PanelDistance_Y.maximum() * 100), self.Sli_PanelDistance_Y.minimum())
+            self.Txt_PanelDistance_Y.setText(str(real))
+            self.Sli_PanelDistance_Y.setValue(real)
+            self.UserChangedPixelSizeText()
+            self.Apply_Image_Zooms(self.get_WidgetSize(self.Frm_TheNewPanel))
+            self.internaldistancecall = False
+
+    def DistanceSliderXChanged(self):
+        if not self.internaldistancecall: 
+            self.Txt_PanelDistance_X.setText(str(self.Sli_PanelDistance_X.value()))
+    def DistanceSliderYChanged(self):
+        if not self.internaldistancecall: 
+            self.Txt_PanelDistance_Y.setText(str(self.Sli_PanelDistance_Y.value()))
+
     ##Step 3.3.1 UserChangedCurPanelPreviewZoom
     def UserChangedCurPanelPreviewZoom(self):
         if self.userIsInputting:
@@ -148,6 +223,16 @@ class Window(QMainWindow, Ui_ImageTilerObj):
             self.ApplyPixelSize()
             self.userIsInputting = True
         
+    ##Step 3.3.2 User moved grid    
+    def SetOGGridGeo(self):
+        self.oggridgeo = self.Grid_LayoutWidget.geometry()
+        #print("Reset:", self.Grid_LayoutWidget.geometry())
+
+    def MouseMovesGrid(self, Delta):
+        self.gridogoffset = self.oggridgeo.topLeft() + Delta
+        self.Grid_LayoutWidget.setGeometry(QRect(self.oggridgeo.topLeft() + Delta, self.oggridgeo.bottomRight() + Delta))
+        #print("Move:", self.Grid_LayoutWidget.geometry())
+
     def UserChangedSaveName(self):
         TrueFileName = None
         if self.Txt_SaveName.text() == "":
@@ -175,35 +260,38 @@ class Window(QMainWindow, Ui_ImageTilerObj):
         
     def FinalSavePanel(self, saveindividualy = False):
         if not self.Check_FinalSavePanel_Vars(): return
-        imgs = []
+        imgs = {}
 
         PanelSize = (good_int(self.Txt_TotalPixelSizeX.text()), good_int(self.Txt_TotalPixelSizeY.text()))
         FrameSize = (good_int(self.Txt_TilePixelSizeX.text()), good_int(self.Txt_TilePixelSizeY.text()))
 
-        for i in self.GridImageList.values():
-            if i.TruePixPath != "":
-                imgs.append(i.get_img_correct_size())
-            else:
-                imgs.append(QPixmap(FrameSize[0], FrameSize[1]).toImage())
+        for k, i in enumerate(self.GridImageList):
+            a = []
+            imgs[k] = a
+            for j in i:
+                imgs[k].append(j.get_img_correct_size())
         
-        if not saveindividualy:
+        if saveindividualy:
+            self.SaveTilesIndividually(imgs)
+        else:
             CorrectPanel = QImage(PanelSize[0], PanelSize[1], QImage.Format.Format_ARGB32)
-
+            
+            CorrectPanel.fill(ascolor(self.GV_Spacingcolor.color))
             painter = QPainter(CorrectPanel)
-            painter.drawImage(0, 0, imgs[0])
-            painter.drawImage(FrameSize[0], 0, imgs[1])
-            painter.drawImage(0, FrameSize[1], imgs[2])
-            painter.drawImage(FrameSize[0], FrameSize[1], imgs[3])
+
+            for i, row in enumerate(imgs.values()):
+                for j, img in enumerate(row):
+                    painter.drawImage(j * FrameSize[0] + max(0,j) * int(self.Txt_PanelDistance_X.text()), i * FrameSize[1] + max(0,i) * int(self.Txt_PanelDistance_Y.text()), img)
             painter.end()
 
             self.SavePanel(CorrectPanel)
-        else:
-            self.SaveTilesIndividually(imgs)
         
     def SavePanel(self, PanelQImage):
         TargetFileFormat = self.Cmb_FinFileFormat.currentText()
         TargetFileFolder = self.Txt_SelTargetFolder.text()
         TargetFileName = self.Txt_SaveName.text()
+        if self.Checkb_FinAutoIncrease.isChecked():
+            TargetFileName = self.get_solid_filename(TargetFileFolder, TargetFileName, TargetFileFormat)
         PanelQImage.save(TargetFileFolder + "\\" + TargetFileName + TargetFileFormat)
     
     def SaveTilesIndividually(self, Tiles = None):
@@ -213,13 +301,15 @@ class Window(QMainWindow, Ui_ImageTilerObj):
         TargetFileBaseName = self.Txt_SaveName.text()
         TargetFileName = ""
 
-        for i in range(len(Tiles)):
-            if TargetFileName == "": 
-                TargetFileName = self.get_solid_filename(TargetFileFolder, TargetFileBaseName + "_", TargetFileFormat)
-                if TargetFileName[-1] == "_": TargetFileName = TargetFileName + "1"
-            TargetFileName = self.get_solid_filename(TargetFileFolder, TargetFileName, TargetFileFormat)
-            if not TargetFileName: return False
-            Tiles[i].save(os.path.join(TargetFileFolder, TargetFileName + TargetFileFormat))
+        for i in range(len(Tiles)):            
+            for k, j in enumerate(Tiles[i]):
+                tileidx = "_" + str(i + 1) + "_" + str(k + 1)
+                if TargetFileName == "": 
+                    TargetFileName = self.get_solid_filename(TargetFileFolder, TargetFileBaseName + "_", TargetFileFormat)
+                    if TargetFileName[-1] == "_": TargetFileName = TargetFileName + "0" 
+                TargetFileName = self.get_solid_filename(TargetFileFolder, TargetFileName + tileidx, TargetFileFormat).replace(tileidx, "", 1)
+                if not TargetFileName: return False
+                j.save(os.path.join(TargetFileFolder, TargetFileName + tileidx + TargetFileFormat))
 
         return True
     def Check_FinalSavePanel_Vars(self):
@@ -241,14 +331,20 @@ class Window(QMainWindow, Ui_ImageTilerObj):
         incrementer = 0
         if os.path.exists(os.path.join(folder, basename + fileformat)):
             if self.Checkb_FinAutoIncrease.isChecked():
-                lastIncrement = re.search(r"(\_|\-)\d+$", basename)
-                if not lastIncrement == None:
-                    lastIncrement = lastIncrement.group(0)
-                    basename = basename[:-len(lastIncrement)]
-                    incrementer = int(lastIncrement.replace("_", "").replace("-", ""))
-                while os.path.exists(os.path.join(folder, basename + "_" + str(incrementer)  + fileformat)):
+                reglastIncrement = re.search(r"(\_|\-)\d+", basename)
+                a = ""
+                a.replace("","",)
+                digits = "0"
+                if not reglastIncrement == None:
+                    lastIncrement = reglastIncrement.group(0)
+                else:
+                    basename = basename + "_0"
+                    lastIncrement = "_0"
+                digits = lastIncrement.replace("_","").replace("-", "")
+                incrementer = int(digits)
+                while os.path.exists(os.path.join(folder, basename.replace(digits, str(incrementer), 1)  + fileformat)):
                     incrementer += 1
-                return basename + "_" + str(incrementer)
+                return basename.replace(digits, str(incrementer), 1)
             else:
                 return basename
         else:
@@ -296,51 +392,106 @@ class Window(QMainWindow, Ui_ImageTilerObj):
         if not sender == None:            
             if sender.text() == "":#Do really nothing if no text
                 return        
+            multx = int(self.Txt_Tiles_X.text())
+            multy = int(self.Txt_Tiles_Y.text())
+            c = self.Checkb_LinkXY.isChecked()
+            isX = "Y" not in sender.objectName()
+            sendername = sender.objectName()
+            distancex, distancey = floor_int(self.Txt_PanelDistance_X.text()), floor_int(self.Txt_PanelDistance_Y.text())
+            if "Tile" in sendername:
+                tilesizex, tilesizey = floor_int(self.Txt_TilePixelSizeX.text()), floor_int(self.Txt_TilePixelSizeY.text())
+                if c:
+                    if isX:
+                        tilesizey = floor_int(tilesizex * self.Var_TilePixelSizeRatio)
+                    else:                    
+                        tilesizex = floor_int(tilesizey / self.Var_TilePixelSizeRatio)
+                totalsizex, totalsizey = floor_int(tilesizex * multx + distancex * max(0, multx - 1)), floor_int(tilesizey * multy + distancey * max(0, multy - 1))
+            elif "Total" in sendername:                
+                totalsizex, totalsizey = floor_int(self.Txt_TotalPixelSizeX.text()), floor_int(self.Txt_TotalPixelSizeY.text())
+                tilesizex, tilesizey = floor_int(totalsizex / multx - distancex), floor_int(totalsizey / multy - distancey)                
+                if c:
+                    if isX:
+                        totalsizey = floor_int(tilesizex * self.Var_TilePixelSizeRatio * multx + distancex * max(0, multx-1))
+                    else:                    
+                        totalsizex = floor_int(tilesizey / self.Var_TilePixelSizeRatio * multy + distancey * max(0, multy-1))
+                tilesizex, tilesizey = floor_int(totalsizex / multx - distancex), floor_int(totalsizey / multy - distancey)    
+            else:   #-> distance changed
+                c = False
+                tilesizex, tilesizey = floor_int(self.Txt_TilePixelSizeX.text()), floor_int(self.Txt_TilePixelSizeY.text())                
+                totalsizex, totalsizey = floor_int(tilesizex * multx + distancex * max(0, multx - 1)), floor_int(tilesizey * multy + distancey * max(0, multy - 1))
+            
             self.userIsInputting = False  # Change to true to make things crash
-            self.LimitTextToInt(sender)   # limits the input to numbers            
-            match sender:                
-                case self.Txt_TilePixelSizeX:
-                    self.Txt_TotalPixelSizeX.setText(str(good_int(self.Txt_TilePixelSizeX.text()) * 2))
-                    if self.Checkb_LinkXY.isChecked():
-                        self.Txt_TilePixelSizeY.setText(str(good_int(int(self.Txt_TilePixelSizeX.text()) / self.Var_TilePixelSizeRatio)))
-                        self.Txt_TotalPixelSizeY.setText(str(good_int(self.Txt_TilePixelSizeY.text()) * 2))
-                case self.Txt_TilePixelSizeY:
-                    self.Txt_TotalPixelSizeY.setText(str(good_int(self.Txt_TilePixelSizeY.text()) * 2))
-                    if self.Checkb_LinkXY.isChecked():
-                        self.Txt_TilePixelSizeX.setText(str(good_int(int(self.Txt_TilePixelSizeY.text()) * self.Var_TilePixelSizeRatio)))
-                        self.Txt_TotalPixelSizeX.setText(str(good_int(float(self.Txt_TilePixelSizeX.text()) * 2)))
-                case self.Txt_TotalPixelSizeX:
-                    self.Txt_TilePixelSizeX.setText(str(good_int(int(self.Txt_TotalPixelSizeX.text()) / 2)))
-                    if self.Checkb_LinkXY.isChecked():
-                        self.Txt_TilePixelSizeY.setText(str(good_int(int(self.Txt_TilePixelSizeX.text()) / self.Var_TilePixelSizeRatio)))
-                        self.Txt_TotalPixelSizeY.setText(str(good_int(int(self.Txt_TilePixelSizeY.text()) * 2)))
-                case self.Txt_TotalPixelSizeY:
-                    self.Txt_TilePixelSizeY.setText(str(good_int(int(self.Txt_TotalPixelSizeY.text()) / 2)))
-                    if self.Checkb_LinkXY.isChecked():
-                        self.Txt_TilePixelSizeX.setText(str(good_int(int(self.Txt_TilePixelSizeY.text()) * self.Var_TilePixelSizeRatio)))
-                        self.Txt_TotalPixelSizeX.setText(str(good_int(int(self.Txt_TilePixelSizeX.text()) * 2)))
+            self.LimitTextToInt(sender)   # limits the input to numbers
+            
+            
+            if c or isX:
+                self.Txt_TotalPixelSizeX.setText(str(totalsizex))
+                self.Txt_TilePixelSizeX.setText(str(tilesizex))
+            if c or not isX:
+                self.Txt_TotalPixelSizeY.setText(str(totalsizey))
+                self.Txt_TilePixelSizeY.setText(str(tilesizey))
+
             if not float(self.Txt_TilePixelSizeY.text()) == 0:
                 self.Var_TilePixelSizeRatio = float(self.Txt_TilePixelSizeX.text()) / float(self.Txt_TilePixelSizeY.text())
             self.ApplyPixelSize()
             self.userIsInputting = True
 
+    def generate_savedic(self, SaveDic = {}, currwidget = None):
+        if not currwidget:
+            currwidget = self
+        if not "Var_TilePixelSizeRatio" in SaveDic: SaveDic["Var_TilePixelSizeRatio"] = self.Var_TilePixelSizeRatio
+        for ele in currwidget.children():
+            val = "#None#None#None#None#"
+            eletype = type(ele)
+            if eletype == QLineEdit:
+                val = ele.text()
+            elif eletype == QCheckBox:
+                val = ele.isChecked()
+            elif eletype == QSlider:
+                val = ele.value()
+            elif eletype == QComboBox:
+                val = ele.currentIndex()
+            elif eletype == ColorPickImageView:
+                SaveDic[ele.objectName()] = asset(ele.color)
+            elif eletype == DragGraphicsView:
+                SaveDic[ele.objectName()] = (ele.currentInternalZoomFactor, ele.deltaX, ele.deltaY, ele.TruePixPath)
+            if val != "#None#None#None#None#":
+                SaveDic[ele.objectName()] = val
+            self.generate_savedic(SaveDic, ele)
+        return SaveDic
+    
+    def set_from_savedic(self, SaveDic = {str, str}, currwdget = None):
+        if not currwdget:
+            currwdget = self
+        if "Var_TilePixelSizeRatio" in SaveDic:
+            self.Var_TilePixelSizeRatio = SaveDic.pop("Var_TilePixelSizeRatio")
+        for ele in currwdget.children():
+            if ele.objectName() in SaveDic:
+                val = SaveDic.pop(ele.objectName())
+                eletype = type(ele)
+                if eletype == QLineEdit:
+                    ele.setText(val) 
+                elif eletype == QCheckBox:
+                    ele.setChecked(val)
+                elif eletype == QSlider:
+                    ele.setValue(val)
+                elif eletype == QComboBox:
+                    ele.setCurrentIndex(val)
+                elif eletype == ColorPickImageView:
+                    ele.setcolor(val)
+                elif eletype == DragGraphicsView:
+                    zoom, dx, dy, truepath = val
+                    ele.currentInternalZoomFactor = zoom
+                    ele.AddImage(truepath, dx, dy)
+            if len(ele.children()) != 0:
+                self.set_from_savedic(SaveDic, ele)
+
     def closeEvent(self, event):
-        SaveDic = {}
-        SaveDic["Var_TilePixelSizeRatio"] = self.Var_TilePixelSizeRatio
-        SaveDic["Txt_TilePixelSizeX"] = self.Txt_TilePixelSizeX.text()
-        SaveDic["Txt_TilePixelSizeY"] = self.Txt_TilePixelSizeY.text()
-        SaveDic["Txt_CurPanelPreviewZoom"] = self.Txt_CurPanelPreviewZoom.text()
-        SaveDic["Checkb_LinkXY"] = self.Checkb_LinkXY.isChecked()
-        SaveDic["Txt_SelSourceFolder"] = self.Txt_SelSourceFolder.text()
-        SaveDic["Txt_SelTargetFolder"] = self.Txt_SelTargetFolder.text()
-        SaveDic["Txt_SaveName"] = self.Txt_SaveName.text()
-        SaveDic["Checkb_FinAutoIncrease"] = self.Checkb_FinAutoIncrease.isChecked()
-        SaveDic["Cmb_FinFileFormat"] = self.Cmb_FinFileFormat.currentIndex()
-        SaveDic["Txt_SaveName"] = self.Txt_SaveName.text()
+        SaveDic = self.generate_savedic()
         self.save_SaveDic(SaveDic)
 
     def save_SaveDic(self, SaveDic):     
-        print(f"Save as " + os.path.join(os.path.dirname(sys.argv[0]), "ImageTileConverterSave.json"))
+        #print(f"Save as " + os.path.join(os.path.dirname(sys.argv[0]), "ImageTileConverterSave.json"))
         savepath = os.path.join(os.path.dirname(sys.argv[0]), "ImageTileConverterSave.json")
         if os.path.exists(savepath):
             os.remove(savepath)
@@ -350,23 +501,13 @@ class Window(QMainWindow, Ui_ImageTilerObj):
         win32api.SetFileAttributes(savepath,win32con.FILE_ATTRIBUTE_HIDDEN)
 
     def load_SaveDic(self):   
-        print(f"Load as " + os.path.join(os.path.dirname(sys.argv[0]), "ImageTileConverterSave.json"))    
+        #print(f"Load as " + os.path.join(os.path.dirname(sys.argv[0]), "ImageTileConverterSave.json"))    
         loadpath = os.path.join(os.path.dirname(sys.argv[0]), "ImageTileConverterSave.json")
         if os.path.exists(loadpath):            
             with open(loadpath, "r") as f:
                 SaveDic = json.load(f)
                 f.close()
-            self.Var_TilePixelSizeRatio = SaveDic["Var_TilePixelSizeRatio"]
-            self.Txt_TilePixelSizeX.setText(SaveDic["Txt_TilePixelSizeX"])
-            self.Txt_TilePixelSizeY.setText(SaveDic["Txt_TilePixelSizeY"])
-            self.Txt_CurPanelPreviewZoom.setText(SaveDic["Txt_CurPanelPreviewZoom"])
-            self.Checkb_LinkXY.setChecked(SaveDic["Checkb_LinkXY"])
-            self.Txt_SelSourceFolder.setText(SaveDic["Txt_SelSourceFolder"])
-            self.Txt_SelTargetFolder.setText(SaveDic["Txt_SelTargetFolder"])
-            self.Txt_SaveName.setText(SaveDic["Txt_SaveName"])
-            self.Checkb_FinAutoIncrease.setChecked(SaveDic["Checkb_FinAutoIncrease"])
-            self.Cmb_FinFileFormat.setCurrentIndex(SaveDic["Cmb_FinFileFormat"])
-            self.Txt_SaveName.setText(SaveDic["Txt_SaveName"])
+            self.set_from_savedic(SaveDic)
             self.ApplyPixelSize()
 
 app = QApplication([])

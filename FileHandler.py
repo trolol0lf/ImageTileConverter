@@ -1,5 +1,6 @@
 import re
 import os
+import PySide6
 from PySide6.QtWidgets import QFileDialog
 
 class xfilelist:
