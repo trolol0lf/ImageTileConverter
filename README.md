@@ -2,7 +2,7 @@
 
 This is the current Version of my "Image Tile Converter"
 
-It is a small tool to generate one image from four. Nothing more!
+It is a small tool to generate one panel of images with variable tile amount, sizes and spacing. Nothing more!
 
 
 
