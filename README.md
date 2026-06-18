@@ -6,9 +6,10 @@ It is a small tool to generate one image from four. Nothing more!
 
 
 
-You can drag, drop, zoom the Images to make compositions of 4 Images and convert it to one final image with scalable Resolution.
+You can drag, drop, zoom the Images to make compositions of Images and convert it to one final image with scalable Resolution.
 
 
 
 Just use the ./dist/ImageTileConverter.exe and you should be good! Or look around in the Project; it's nothing special
 
+<img width="1173" height="924" alt="Screenshot" src="https://github.com/user-attachments/assets/08335547-e7d8-4bf0-9b53-1e20ebf1bc27" />
