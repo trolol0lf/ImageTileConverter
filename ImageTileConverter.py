@@ -240,7 +240,7 @@ class Window(QMainWindow, Ui_ImageTilerObj):
         else:
             curSaveName = self.Txt_SaveName.text()
             ChangedSaveName = curSaveName            
-            forbiddensigns = re.findall("[^a-zA-Z0-9\-\_]", curSaveName)
+            forbiddensigns = re.findall(r"[^a-zA-Z0-9\-\_]", curSaveName)
             for i in forbiddensigns:
                 ChangedSaveName = curSaveName.replace(i, "_")            
             TrueFileName = self.get_solid_filename(self.Txt_SelTargetFolder.text(), ChangedSaveName, self.Cmb_FinFileFormat.currentText())
